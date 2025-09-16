@@ -1,0 +1,130 @@
+import json
+import time
+import random
+import ssl
+import csv
+from datetime import datetime
+import paho.mqtt.client as mqtt
+
+# AWS IoT Core endpoint
+AWS_ENDPOINT = "a2dohm0tjgfpc3-ats.iot.us-east-1.amazonaws.com"
+AWS_PORT = 8883
+
+# File paths for certs/keys
+CA_PATH = "AmazonRootCA1.pem"
+CERT_PATH = "device-cert.pem.crt"
+KEY_PATH = "device-private.pem.key"
+
+# MQTT topic
+TOPIC = "vital-link/ambulance1/vitals"
+
+# MQTT client setup
+client = mqtt.Client()
+connected_flag = False
+
+# TLS/SSL configuration
+client.tls_set(
+    ca_certs=CA_PATH,
+    certfile=CERT_PATH,
+    keyfile=KEY_PATH,
+    tls_version=ssl.PROTOCOL_TLSv1_2
+)
+
+# Connection callbacks
+def on_connect(client, userdata, flags, rc):
+    global connected_flag
+    if rc == 0:
+        connected_flag = True
+        print("✅ Connected to AWS IoT Core")
+    else:
+        print(f"❌ Failed to connect, return code {rc}")
+
+def on_disconnect(client, userdata, rc):
+    global connected_flag
+    connected_flag = False
+    print("⚠️ Disconnected from AWS IoT Core")
+
+client.on_connect = on_connect
+client.on_disconnect = on_disconnect
+
+print("Connecting to AWS IoT Core...")
+client.connect(AWS_ENDPOINT, AWS_PORT, keepalive=60)
+client.loop_start()
+
+# -------- Simulate Vitals --------
+def simulate_vitals():
+    """Simulate random vital signs with varied alerts for demo"""
+    vitals = {
+        "patient_name": "Demo Patient",
+        "patient_age": random.randint(20, 70),
+        "heart_rate": random.choice([75, 95, 115, 130]),   # normal & high
+        "spo2": random.choice([95, 92, 88, 85]),           # normal & low
+        "temperature": round(random.choice([36.5, 37.2, 38.5, 39.0]), 1),
+        "blood_pressure": f"{random.randint(110, 140)}/{random.randint(70, 90)}"
+    }
+
+    alerts = []
+    if vitals["spo2"] < 90:
+        alerts.append("ALERT: Low SpO2!")
+    if vitals["heart_rate"] > 110:
+        alerts.append("ALERT: High Heart Rate!")
+    if vitals["temperature"] > 38.0:
+        alerts.append("ALERT: High Temperature!")
+
+    vitals["alerts"] = alerts
+    return vitals
+
+# -------- CSV Setup --------
+CSV_FILE = "vitals_log.csv"
+
+# Write header if file is new
+with open(CSV_FILE, "a", newline="") as csvfile:
+    writer = csv.writer(csvfile)
+    if csvfile.tell() == 0:  # file empty
+        writer.writerow([
+            "timestamp",
+            "patient_name",
+            "patient_age",
+            "heart_rate",
+            "spo2",
+            "temperature",
+            "blood_pressure",
+            "alerts"
+        ])
+
+# -------- Publish Loop --------
+try:
+    while True:
+        data = simulate_vitals()
+        payload = json.dumps(data)
+
+        if connected_flag:
+            try:
+                client.publish(TOPIC, payload, qos=1)
+                print(f"📡 Published to AWS: {payload}")
+            except Exception as e:
+                print(f"❌ Publish error: {e}")
+        else:
+            print("⏳ Waiting for AWS connection...")
+
+        # Save to CSV as backup
+        with open(CSV_FILE, "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                data["patient_name"],
+                data["patient_age"],
+                data["heart_rate"],
+                data["spo2"],
+                data["temperature"],
+                data["blood_pressure"],
+                "; ".join(data["alerts"])
+            ])
+        print("💾 Saved locally to vitals_log.csv")
+
+        time.sleep(5)  # every 5 seconds
+
+except KeyboardInterrupt:
+    print("\n🛑 Stopping simulation...")
+    client.loop_stop()
+    client.disconnect()
