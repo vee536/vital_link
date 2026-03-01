@@ -31,7 +31,7 @@ signal.signal(signal.SIGINT, cleanup_and_exit)
 signal.signal(signal.SIGTERM, cleanup_and_exit)
 
 # ---------------------------- MQTT Setup ----------------------------
-AWS_ENDPOINT = "a2dohm0tjgfpc3-ats.iot.us-east-1.amazonaws.com"
+AWS_ENDPOINT = "aj3jbl23441fa-ats.iot.eu-north-1.amazonaws.com"
 AWS_PORT = 8883
 TOPIC = "vital-link/ambulance1/vitals"
 
