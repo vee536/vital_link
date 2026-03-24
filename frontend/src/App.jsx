@@ -14,9 +14,7 @@ const PAGE_TITLES = {
 
 export default function App() {
   const [activePage, setActivePage] = useState('dashboard')
-  const { ambulances, status, reconnectCount } = useWebSocket()
-
-  const ambulanceCount = Object.keys(ambulances).length
+  const { ambulances, ambulanceCount, status, reconnectCount } = useWebSocket()
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0a0a0f] text-gray-100">
@@ -24,14 +22,18 @@ export default function App() {
         activePage={activePage}
         onNavigate={setActivePage}
         connectionStatus={status}
-        ambulanceCount={ambulanceCount}
+        ambulanceCount={ambulanceCount}   // ✅ live count from map
       />
 
       <main className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <ConnectionBanner status={status} reconnectCount={reconnectCount} />
 
         {activePage === 'dashboard' ? (
-          <DashboardPage ambulances={ambulances} status={status} />
+          <DashboardPage
+            ambulances={ambulances}         // ✅ pass full map
+            ambulanceCount={ambulanceCount}
+            status={status}
+          />
         ) : (
           <PlaceholderPage title={PAGE_TITLES[activePage] || activePage} />
         )}

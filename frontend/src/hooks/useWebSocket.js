@@ -1,24 +1,20 @@
 import { useEffect, useRef, useCallback, useReducer } from 'react'
-import { WS_URL, RECONNECT_DELAY_MS, MAX_RECONNECT_ATTEMPTS } from '../utils/config'
+import { RECONNECT_DELAY_MS, MAX_RECONNECT_ATTEMPTS } from '../utils/config'
 
 // ── State ────────────────────────────────────────────────────────────────────
 
 const initialState = {
-  ambulances: [],     // { [ambulance_id]: latestMessage }
+  // ambulances is a map: { [ambulance_id]: latestVitalsObject }
+  ambulances: {},
   status: 'connecting', // 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
   lastMessage: null,
   reconnectCount: 0,
 }
 
-function reducer(state, action) {
-  switch (action.type) {
-    case 'SET_STATUS':
-      return { ...state, status: action.payload }
+// ── Reducer ───────────────────────────────────────────────────────────────────
+// MESSAGE upserts the latest payload keyed by ambulance_id.
+// If ambulance_id is missing, falls back to 'UNKNOWN' so old payloads still render.
 
-    case 'SET_RECONNECT_COUNT':
-      return { ...state, reconnectCount: action.payload }
-
-    
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_STATUS':
@@ -28,22 +24,17 @@ function reducer(state, action) {
       return { ...state, reconnectCount: action.payload }
 
     case 'MESSAGE': {
-  const data = action.payload
-
-  return {
-    ...state,
-    lastMessage: data,
-    ambulances: [data],   // store latest message as array
-  }
-}
-
-    default:
-      return state
-  }
-}
-
-// ── Hook ─────────────────────────────────────────────────────────────────────
-
+      const data = action.payload
+      const id = data.ambulance_id || 'UNKNOWN'
+      return {
+        ...state,
+        lastMessage: data,
+        ambulances: {
+          ...state.ambulances,
+          [id]: data,   // ✅ upsert: create or overwrite this ambulance's entry
+        },
+      }
+    }
 
     default:
       return state
@@ -69,13 +60,12 @@ export function useWebSocket() {
   const connect = useCallback(() => {
     if (unmountedRef.current) return
 
-    // Close existing socket if any
     if (wsRef.current) {
       wsRef.current.onclose = null
       wsRef.current.close()
     }
 
-    const ws = new WebSocket("wss://018nlv643l.execute-api.eu-north-1.amazonaws.com/production");
+    const ws = new WebSocket("wss://018nlv643l.execute-api.eu-north-1.amazonaws.com/production")
     wsRef.current = ws
 
     ws.onopen = () => {
@@ -85,19 +75,19 @@ export function useWebSocket() {
       dispatch({ type: 'SET_RECONNECT_COUNT', payload: 0 })
     }
 
-   ws.onmessage = (event) => {
-  if (unmountedRef.current) return
-  try {
-    const data = JSON.parse(event.data)
-    console.log("Reducer updating with:", data)
-    dispatch({ type: 'MESSAGE', payload: data })
-  } catch (err) {
-    console.warn('[VitalLink] Failed to parse WebSocket message:', err)
-  }
-}
+    ws.onmessage = (event) => {
+      if (unmountedRef.current) return
+      try {
+        const data = JSON.parse(event.data)
+        console.log('[VitalLink] Vitals update:', data)
+        dispatch({ type: 'MESSAGE', payload: data })
+      } catch (err) {
+        console.warn('[VitalLink] Failed to parse WebSocket message:', err)
+      }
+    }
 
     ws.onerror = () => {
-      // onerror is always followed by onclose, so we handle reconnect there
+      // always followed by onclose — reconnect logic lives there
     }
 
     ws.onclose = () => {
@@ -136,7 +126,10 @@ export function useWebSocket() {
   }, [connect, clearReconnectTimer])
 
   return {
-    ambulances: state.ambulances,
+    ambulances: state.ambulances,           // ✅ map of all live ambulances
+    ambulanceCount: Object.keys(state.ambulances).length,
+    // backwards-compat: latest message regardless of source
+    latestVitals: state.lastMessage,
     status: state.status,
     lastMessage: state.lastMessage,
     reconnectCount: state.reconnectCount,
