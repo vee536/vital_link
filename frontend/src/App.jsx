@@ -16,7 +16,7 @@ export default function App() {
   const [activePage, setActivePage] = useState('dashboard')
   const { ambulances, status, reconnectCount } = useWebSocket()
 
-  const ambulanceCount = Object.keys(ambulances).length
+  const ambulanceCount = ambulances.length
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0a0a0f] text-gray-100">

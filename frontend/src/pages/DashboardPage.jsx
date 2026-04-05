@@ -16,8 +16,9 @@ const sorted = useMemo(() => {
   })
 }, [ambulances])
 
-const highCount = 0   // backend does not send priority
-const inProgressCount = 0  // backend does not send status
+const highCount = sorted.filter(a => a.ai?.severity?.toLowerCase() === 'critical').length
+const inProgressCount = sorted.length
+
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
