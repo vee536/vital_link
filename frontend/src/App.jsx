@@ -14,13 +14,9 @@ const PAGE_TITLES = {
 
 export default function App() {
   const [activePage, setActivePage] = useState('dashboard')
-<<<<<<< HEAD
   const { ambulances, status, reconnectCount } = useWebSocket()
 
   const ambulanceCount = ambulances.length
-=======
-  const { ambulances, ambulanceCount, status, reconnectCount } = useWebSocket()
->>>>>>> 7d91392ca5dc49f7677fd438c56bf03998a75c25
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0a0a0f] text-gray-100">
